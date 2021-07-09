@@ -1,3 +1,20 @@
+=== 13.0.6
+
+* Additional fix for #389
+  Pull request #390 by hsbt
+
+=== 13.0.5
+
+* Fixed the regression of #388
+  Pull request #389 by hsbt
+
+=== 13.0.4
+
+* Fix rake test loader swallowing useful error information.
+  Pull request #367 by deivid-rodriguez
+* Add -C/--directory option the same as GNU make.
+  Pull request #376 by nobu
+
 === 13.0.3
 
 * Fix breaking change of execution order on TestTask.
