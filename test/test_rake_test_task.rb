@@ -5,6 +5,21 @@ require "rake/testtask"
 class TestRakeTestTask < Rake::TestCase # :nodoc:
   include Rake
 
+  def setup
+    super
+    @_previous_testopts = ENV["TESTOPTS"]
+    ENV.delete "TESTOPTS"
+  end
+
+  def teardown
+    if @_previous_testopts.nil?
+      ENV.delete "TESTOPTS"
+    else
+      ENV["TESTOPTS"] = @_previous_testopts
+    end
+    super
+  end
+
   def test_initialize
     tt = Rake::TestTask.new do |t| end
     refute_nil tt
@@ -63,6 +78,17 @@ class TestRakeTestTask < Rake::TestCase # :nodoc:
     ENV.delete "TEST"
   end
 
+  def test_file_list_env_test_multiple
+    ENV["TEST"] = "testfile.rb,othertestfile.rb"
+    tt = Rake::TestTask.new do |t|
+      t.pattern = "*"
+    end
+
+    assert_equal ["testfile.rb", "othertestfile.rb"], tt.file_list.to_a
+  ensure
+    ENV.delete "TEST"
+  end
+
   def test_libs_equals
     test_task = Rake::TestTask.new do |t|
       t.libs << ["A", "B"]
@@ -115,8 +141,40 @@ class TestRakeTestTask < Rake::TestCase # :nodoc:
       # t.pettern is "test/test*.rb"
     end
 
-    assert_equal '-e "ARGV.each{|f| require f}"', test_task.run_code
+    assert_equal %q{-e "ARGV.each{|f| require f unless f.start_with?('-')}"}, test_task.run_code
     assert_equal globbed, test_task.file_list.to_a
+  end
+
+  def test_run_code_direct_skips_option_arguments
+    test_task = Rake::TestTask.new do |t|
+      t.loader = :direct
+      t.verbose = true
+    end
+
+    code = test_task.run_code[/\A-e "(.*)"\z/, 1]
+    refute_nil code
+
+    required = []
+    receiver = Object.new
+    receiver.define_singleton_method(:require) { |file| required << file }
+
+    saved_argv = ARGV.dup
+    begin
+      ARGV.replace(["test/foo_test.rb", "-v"])
+      receiver.instance_eval(code)
+    ensure
+      ARGV.replace(saved_argv)
+    end
+
+    assert_equal ["test/foo_test.rb"], required
+  end
+
+  test "run code test-unit" do
+    test_task = Rake::TestTask.new do |t|
+      t.loader = :"test-unit"
+    end
+
+    assert_equal("-S test-unit", test_task.run_code)
   end
 
   def test_run_code_rake
@@ -171,20 +229,77 @@ class TestRakeTestTask < Rake::TestCase # :nodoc:
   end
 
   def test_task_order_only_prerequisites
-    t = task(a: 'b') {
+    t = task(a: "b") {
       :aaa
-    } | 'c'
-    b, c = task('b'), task('c')
-    assert_equal ['b'], t.prerequisites
-    assert_equal ['c'], t.order_only_prerequisites
+    } | "c"
+    b, c = task("b"), task("c")
+    assert_equal ["b"], t.prerequisites
+    assert_equal ["c"], t.order_only_prerequisites
     assert_equal [b, c], t.prerequisite_tasks
   end
 
+  def test_option_list_verbose_without_testopts
+    tt = Rake::TestTask.new { |t| t.verbose = true }
+    assert_equal "-v", tt.option_list
+  end
+
+  def test_option_list_verbose_with_testopts
+    ENV["TESTOPTS"] = "--ci-reporter"
+    tt = Rake::TestTask.new { |t| t.verbose = true }
+    assert_equal "--ci-reporter -v", tt.option_list
+  end
+
+  def test_option_list_not_verbose_with_testopts
+    ENV["TESTOPTS"] = "--ci-reporter"
+    tt = Rake::TestTask.new { |t| t.verbose = false }
+    assert_equal "--ci-reporter", tt.option_list
+  end
+
+  def test_option_list_skips_duplicate_v
+    ENV["TESTOPTS"] = "-v --ci-reporter"
+    tt = Rake::TestTask.new { |t| t.verbose = true }
+    assert_equal "-v --ci-reporter", tt.option_list
+  end
+
+  def test_option_list_verbose_keyword_overrides
+    tt = Rake::TestTask.new { |t| t.verbose = false }
+    assert_equal "-v", tt.option_list(verbose: true)
+  end
+
+  def test_run_omits_v_for_global_verbose_only
+    # --trace and -n set the global verbose flag via Rake.verbose(true), but
+    # that must not leak "-v" into the test runner's ARGV. (issue #732)
+    Rake::FileUtilsExt.verbose_flag = true
+    tt = Rake::TestTask.new { |t| t.verbose = false }
+    refute_includes captured_test_command(tt).split, "-v"
+  ensure
+    Rake::FileUtilsExt.verbose_flag = false
+  end
+
+  def test_run_injects_v_for_task_verbose
+    tt = Rake::TestTask.new { |t| t.verbose = true }
+    assert_includes captured_test_command(tt).split, "-v"
+  end
+
   def test_task_order_only_prerequisites_key
-    t = task 'a' => 'b', order_only: ['c']
-    b, c = task('b'), task('c')
-    assert_equal ['b'], t.prerequisites
-    assert_equal ['c'], t.order_only_prerequisites
+    t = task "a" => "b", order_only: ["c"]
+    b, c = task("b"), task("c")
+    assert_equal ["b"], t.prerequisites
+    assert_equal ["c"], t.order_only_prerequisites
     assert_equal [b, c], t.prerequisite_tasks
+  end
+
+  private
+
+  # Run the test task's action with the +ruby+ invocation stubbed out and
+  # return the command string that would have been executed.
+  def captured_test_command(test_task)
+    command = nil
+    test_task.define_singleton_method(:ruby) do |*args, **_opts, &_block|
+      command = args.first
+      nil
+    end
+    Rake::Task[test_task.name].execute
+    command
   end
 end

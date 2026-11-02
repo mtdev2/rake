@@ -48,7 +48,7 @@ module FileUtils
     verbose = options.delete :verbose
     noop    = options.delete(:noop) || Rake::FileUtilsExt.nowrite_flag
 
-    Rake.rake_output_message sh_show_command cmd if verbose
+    Rake.rake_output_message sh_show_command(cmd, options) if verbose
 
     unless noop
       res = (Hash === cmd.last) ? system(*cmd) : system(*cmd, options)
@@ -60,8 +60,6 @@ module FileUtils
 
   def create_shell_runner(cmd) # :nodoc:
     show_command = sh_show_command cmd
-    show_command = show_command[0, 42] + "..." unless $trace
-
     lambda do |ok, status|
       ok or
         fail "Command failed with status (#{status.exitstatus}): " +
@@ -70,7 +68,7 @@ module FileUtils
   end
   private :create_shell_runner
 
-  def sh_show_command(cmd) # :nodoc:
+  def sh_show_command(cmd, options = nil) # :nodoc:
     cmd = cmd.dup
 
     if Hash === cmd.first
@@ -79,7 +77,12 @@ module FileUtils
       cmd[0] = env
     end
 
-    cmd.join " "
+    cmd = cmd.join " "
+    if options and chdir = options[:chdir]
+      "(cd #{chdir} && #{cmd})"
+    else
+      cmd
+    end
   end
   private :sh_show_command
 

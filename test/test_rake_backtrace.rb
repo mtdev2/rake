@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 require File.expand_path("../helper", __FILE__)
-require "open3"
 
 class TestBacktraceSuppression < Rake::TestCase # :nodoc:
   def test_bin_rake_suppressed
@@ -32,6 +31,14 @@ class TestBacktraceSuppression < Rake::TestCase # :nodoc:
 
     assert_equal paths, actual
   end
+
+  def test_ruby_array_each_suppressed
+    paths = ["<internal:array>:52:in 'Array#each'"]
+
+    actual = Rake::Backtrace.collapse(paths)
+
+    assert_equal [], actual
+  end
 end
 
 class TestRakeBacktrace < Rake::TestCase # :nodoc:
@@ -40,7 +47,7 @@ class TestRakeBacktrace < Rake::TestCase # :nodoc:
   def setup
     super
 
-    skip "tmpdir is suppressed in backtrace" if
+    omit "tmpdir is suppressed in backtrace" if
       Rake::Backtrace::SUPPRESS_PATTERN =~ Dir.pwd
   end
 

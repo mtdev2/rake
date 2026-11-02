@@ -74,10 +74,10 @@ Type "rake --help" for all available options.
 
 === Rake Information
 
-* {Rake command-line}[link:doc/command_line_usage.rdoc]
-* {Writing Rakefiles}[link:doc/rakefile.rdoc]
-* The original {Rake announcement}[link:doc/rational.rdoc]
-* Rake {glossary}[link:doc/glossary.rdoc]
+* {Rake command-line}[rdoc-ref:doc/command_line_usage.rdoc]
+* {Writing Rakefiles}[rdoc-ref:doc/rakefile.rdoc]
+* The original {Rake announcement}[rdoc-ref:doc/rational.rdoc]
+* Rake {glossary}[rdoc-ref:doc/glossary.rdoc]
 
 === Presentations and Articles about Rake
 
@@ -116,7 +116,7 @@ other projects with similar (and not so similar) goals.
 
 [<b>Eric Hodel</b>] For aid in maintaining rake.
 
-[<b>Hiroshi SHIBATA</b>] Maintainer of Rake 10.X and Rake 11.X
+[<b>Hiroshi SHIBATA</b>] Maintainer of Rake 10 and later
 
 == License
 
@@ -148,7 +148,7 @@ February 2014. This repository was originally hosted at
 with his passing, has been moved to {ruby/rake}[https://github.com/ruby/rake].
 
 You can view Jim's last commit here:
-https://github.com/jimweirich/rake/tree/336559f28f55bce418e2ebcc0a57548dcbac4025
+https://github.com/jimweirich/rake/commit/336559f28f55bce418e2ebcc0a57548dcbac4025
 
 You can {read more about Jim}[https://en.wikipedia.org/wiki/Jim_Weirich] at Wikipedia.
 

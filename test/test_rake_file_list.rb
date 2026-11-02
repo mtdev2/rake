@@ -23,10 +23,10 @@ class TestRakeFileList < Rake::TestCase # :nodoc:
     FileUtils.touch "abc.x"
     FileUtils.touch "existing"
 
-    open "xyzzy.txt", "w" do |io|
-      io.puts "x"
-      io.puts "XYZZY"
-    end
+    File.write "xyzzy.txt", <<~EOTEXT
+      x
+      XYZZY
+    EOTEXT
 
   end
 
@@ -383,7 +383,7 @@ class TestRakeFileList < Rake::TestCase # :nodoc:
   def test_egrep_with_output
     files = FileList["*.txt"]
 
-    out, = capture_io do
+    out, = capture_output do
       files.egrep(/XYZZY/)
     end
 
@@ -404,7 +404,7 @@ class TestRakeFileList < Rake::TestCase # :nodoc:
   def test_egrep_with_error
     files = FileList["*.txt"]
 
-    _, err = capture_io do
+    _, err = capture_output do
       files.egrep(/XYZZY/) do |fn, ln, line |
         raise "_EGREP_FAILURE_"
       end
@@ -496,7 +496,7 @@ class TestRakeFileList < Rake::TestCase # :nodoc:
     assert_equal ["a", "b", "c"], d
   end
 
-  if RUBY_VERSION < '2.7'
+  if RUBY_VERSION < "2.7"
     def test_dup_and_clone_replicate_taint
       a = FileList["a", "b", "c"]
       a.taint
@@ -519,7 +519,8 @@ class TestRakeFileList < Rake::TestCase # :nodoc:
     a = FileList["a", "b", "c"]
     a.freeze
     c = a.clone
-    assert_raises(TypeError, RuntimeError) do
+    error_class = defined?(FrozenError) ? FrozenError : RuntimeError
+    assert_raises(error_class) do
       c << "more"
     end
   end
@@ -562,19 +563,19 @@ class TestRakeFileList < Rake::TestCase # :nodoc:
     assert_equal ["a", "b"], b
     assert_equal FileList,  b.class
 
-    b = a.sort_by { |it| it }
+    b = a.sort_by { |i| i }
     assert_equal ["a", "b"], b
     assert_equal FileList,  b.class
 
-    b = a.select { |it| it == "b" }
+    b = a.select { |i| i == "b" }
     assert_equal ["b"], b
     assert_equal FileList,  b.class
 
-    b = a.select { |it| it.size == 1 }
+    b = a.select { |i| i.size == 1 }
     assert_equal ["a", "b"], b
     assert_equal FileList,  b.class
 
-    b = a.reject { |it| it == "b" }
+    b = a.reject { |i| i == "b" }
     assert_equal ["a"], b
     assert_equal FileList,  b.class
 
@@ -582,7 +583,7 @@ class TestRakeFileList < Rake::TestCase # :nodoc:
     assert_equal ["a", "b"], b
     assert_equal FileList,  b.class
 
-    b = a.partition { |it| it == "b" }
+    b = a.partition { |i| i == "b" }
     assert_equal [["b"], ["a"]], b
     assert_equal Array, b.class
     assert_equal FileList,  b[0].class

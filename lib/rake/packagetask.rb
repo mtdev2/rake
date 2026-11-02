@@ -2,8 +2,8 @@
 # Define a package task library to aid in the definition of
 # redistributable package files.
 
-require "rake"
-require "rake/tasklib"
+require_relative "../rake"
+require_relative "tasklib"
 
 module Rake
 
@@ -79,7 +79,7 @@ module Rake
     # Zip command for zipped archives.  The default is 'zip'.
     attr_accessor :zip_command
 
-    # True if parent directory should be omited (default is false)
+    # True if parent directory should be omitted (default is false)
     attr_accessor :without_parent_dir
 
     # Create a Package Task with the given name and version.  Use +:noversion+

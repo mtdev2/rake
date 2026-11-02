@@ -1,5 +1,7 @@
 # frozen_string_literal: true
-$:.unshift File.expand_path("../../lib", __FILE__)
+
+lib = File.expand_path("../../lib", __FILE__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 begin
   if ENV["COVERALLS"]
@@ -10,8 +12,7 @@ begin
 rescue Gem::LoadError
 end
 
-gem "minitest", "~> 5"
-require "minitest/autorun"
+require "test/unit"
 require "rake"
 require "tmpdir"
 
@@ -19,7 +20,7 @@ require_relative "support/file_creation"
 require_relative "support/ruby_runner"
 require_relative "support/rakefile_definitions"
 
-class Rake::TestCase < Minitest::Test
+class Rake::TestCase < Test::Unit::TestCase
   include FileCreation
 
   include Rake::DSL
@@ -28,7 +29,7 @@ class Rake::TestCase < Minitest::Test
     include Rake::TaskManager
   end
 
-  RUBY = File.realpath(ENV["RUBY"] || Gem.ruby)
+  RUBY = (ENV["RUBY"] || Gem.ruby)
 
   def setup
     ARGV.clear
@@ -92,25 +93,21 @@ class Rake::TestCase < Minitest::Test
   end
 
   def rake_system_dir
-    @system_dir = "system"
+    system_dir = "system"
 
-    FileUtils.mkdir_p @system_dir
+    FileUtils.mkdir_p system_dir
 
-    open File.join(@system_dir, "sys1.rake"), "w" do |io|
-      io << <<-SYS
-task "sys1" do
-  puts "SYS1"
-end
-      SYS
-    end
+    File.write File.join(system_dir, "sys1.rake"), <<~SYS
+      task "sys1" do
+        puts "SYS1"
+      end
+    SYS
 
-    ENV["RAKE_SYSTEM"] = @system_dir
+    ENV["RAKE_SYSTEM"] = system_dir
   end
 
   def rakefile(contents)
-    open "Rakefile", "w" do |io|
-      io << contents
-    end
+    File.write "Rakefile", contents
   end
 
   def jruby?
@@ -123,6 +120,10 @@ end
 
   def jruby9?
     jruby? && (JRUBY_VERSION >= "9.0.0.0")
+  end
+
+  def jruby90?
+    jruby? && JRUBY_VERSION.start_with?("9.0.")
   end
 
   include RakefileDefinitions

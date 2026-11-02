@@ -94,6 +94,10 @@ module Rake
       @hash.fetch(*args, &block)
     end
 
+    def deconstruct_keys(keys)
+      keys ? @hash.slice(*keys) : to_hash
+    end
+
     protected
 
     def lookup(name) # :nodoc:

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
-require "rake"
-require "rake/tasklib"
+require_relative "../rake"
+require_relative "tasklib"
 
 module Rake
 
@@ -60,7 +60,7 @@ module Rake
     # Style of test loader to use.  Options are:
     #
     # * :rake -- Rake provided test loading script (default).
-    # * :testrb -- Ruby provided test loading script.
+    # * :"test-unit" -- test-unit provided test loading script.
     # * :direct -- Load tests using command line loader.
     #
     attr_accessor :loader
@@ -108,12 +108,14 @@ module Rake
     def define
       desc @description
       task @name => Array(deps) do
-        FileUtilsExt.verbose(@verbose) do
-          puts "Use TESTOPTS=\"--verbose\" to pass --verbose" \
-            ", etc. to runners." if ARGV.include? "--verbose"
+        effective_verbose = @verbose || FileUtilsExt.verbose_flag == true
+        FileUtilsExt.verbose(effective_verbose) do
+          # The global verbose flag (e.g. set by --trace or -n) controls
+          # whether rake echoes the command, but it must not inject "-v"
+          # into the test runner's ARGV. Only the task's own @verbose does.
           args =
             "#{ruby_opts_string} #{run_code} " +
-            "#{file_list_string} #{option_list}"
+            "#{file_list_string} #{option_list(verbose: @verbose)}"
           ruby args do |ok, status|
             if !ok && status.respond_to?(:signaled?) && status.signaled?
               raise SignalException.new(status.termsig)
@@ -135,13 +137,17 @@ module Rake
       self
     end
 
-    def option_list # :nodoc:
-      (ENV["TESTOPTS"] ||
+    def option_list(verbose: @verbose) # :nodoc:
+      opts = ENV["TESTOPTS"] ||
         ENV["TESTOPT"] ||
         ENV["TEST_OPTS"] ||
         ENV["TEST_OPT"] ||
         @options ||
-        "")
+        ""
+      if verbose && !opts.split.include?("-v")
+        opts = opts.empty? ? "-v" : "#{opts} -v"
+      end
+      opts
     end
 
     def ruby_opts_string # :nodoc:
@@ -161,7 +167,7 @@ module Rake
 
     def file_list # :nodoc:
       if ENV["TEST"]
-        FileList[ENV["TEST"]]
+        FileList[ENV["TEST"].split(",")]
       else
         result = []
         result += @test_files.to_a if @test_files
@@ -177,9 +183,9 @@ module Rake
     def run_code # :nodoc:
       case @loader
       when :direct
-        "-e \"ARGV.each{|f| require f}\""
-      when :testrb
-        "-S testrb"
+        "-e \"ARGV.each{|f| require f unless f.start_with?('-')}\""
+      when :"test-unit"
+        "-S test-unit"
       when :rake
         "#{__dir__}/rake_test_loader.rb"
       end

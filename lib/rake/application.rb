@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 require "optparse"
 
-require "rake/task_manager"
-require "rake/file_list"
-require "rake/thread_pool"
-require "rake/thread_history_display"
-require "rake/trace_output"
-require "rake/win32"
+require_relative "options"
+require_relative "task_manager"
+require_relative "file_list"
+require_relative "thread_pool"
+require_relative "thread_history_display"
+require_relative "trace_output"
+require_relative "win32"
 
 module Rake
 
@@ -94,9 +95,31 @@ module Rake
           # Backward compatibility for capistrano
           args = handle_options
         end
+        load_debug_at_stop_feature
         collect_command_line_tasks(args)
       end
     end
+
+    def load_debug_at_stop_feature
+      return unless ENV["RAKE_DEBUG"]
+      require "debug/session"
+      DEBUGGER__::start no_sigint_hook: true, nonstop: true
+      Rake::Task.prepend Module.new {
+        def execute(*)
+          exception = DEBUGGER__::SESSION.capture_exception_frames(/(exe|bin|lib)\/rake/) do
+            super
+          end
+
+          if exception
+            STDERR.puts exception.message
+            DEBUGGER__::SESSION.enter_postmortem_session exception
+            raise exception
+          end
+        end
+      }
+    rescue LoadError
+    end
+    private :load_debug_at_stop_feature
 
     # Find the rakefile and then load it and any pending imports.
     def load_rakefile
@@ -123,8 +146,8 @@ module Rake
       thread_pool.gather_history if options.job_stats == :history
 
       yield
-
-      thread_pool.join
+    ensure
+      thread_pool.join if defined?(@thread_pool)
       if options.job_stats
         stats = thread_pool.statistics
         puts "Maximum active threads: #{stats[:max_active_threads]} + main"
@@ -143,7 +166,7 @@ module Rake
 
     # Application options from the command line
     def options
-      @options ||= OpenStruct.new
+      @options ||= Options.new
     end
 
     # Return the thread pool used for multithreaded processing.
@@ -215,7 +238,7 @@ module Rake
       display_exception_details_seen << ex
 
       display_exception_message_details(ex)
-      display_exception_backtrace(ex)
+      display_exception_backtrace(ex) if ex.backtrace
       display_cause_details(ex.cause) if has_cause?(ex)
     end
 
@@ -237,6 +260,8 @@ module Rake
     def display_exception_message_details(ex) # :nodoc:
       if ex.instance_of?(RuntimeError)
         trace ex.message
+      elsif ex.respond_to?(:detailed_message)
+        trace "#{ex.class.name}: #{ex.detailed_message(highlight: false)}"
       else
         trace "#{ex.class.name}: #{ex.message}"
       end
@@ -433,6 +458,13 @@ module Rake
               select_tasks_to_show(options, :describe, value)
             }
           ],
+          ["--directory", "-C [DIRECTORY]",
+            "Change to DIRECTORY before doing anything.",
+            lambda { |value|
+              Dir.chdir value
+              @original_dir = Dir.pwd
+            }
+          ],
           ["--dry-run", "-n",
             "Do a dry run without executing actions.",
             lambda { |value|
@@ -568,7 +600,7 @@ module Rake
           ["--tasks", "-T [PATTERN]",
             "Display the tasks (matching optional PATTERN) " +
             "with descriptions, then exit. " +
-            "-AT combination displays all of tasks contained no description.",
+            "-AT combination displays all the tasks, including those without descriptions.",
             lambda { |value|
               select_tasks_to_show(options, :tasks, value)
             }
@@ -654,7 +686,7 @@ module Rake
 
     # Similar to the regular Ruby +require+ command, but will check
     # for *.rake files in addition to *.rb files.
-    def rake_require(file_name, paths=$LOAD_PATH, loaded=$") # :nodoc:
+    def rake_require(file_name, paths=$LOAD_PATH, loaded=$LOADED_FEATURES) # :nodoc:
       fn = file_name + ".rake"
       return false if loaded.include?(fn)
       paths.each do |path|
@@ -718,24 +750,15 @@ module Rake
 
     # The directory path containing the system wide rakefiles.
     def system_dir # :nodoc:
-      @system_dir ||=
-        begin
-          if ENV["RAKE_SYSTEM"]
-            ENV["RAKE_SYSTEM"]
-          else
-            standard_system_dir
-          end
-        end
+      @system_dir ||= ENV["RAKE_SYSTEM"] || standard_system_dir
     end
 
     # The standard directory containing system wide rake files.
-    if Win32.windows?
-      def standard_system_dir #:nodoc:
-        Win32.win32_system_dir
-      end
-    else
-      def standard_system_dir #:nodoc:
-        File.join(File.expand_path("~"), ".rake")
+    def standard_system_dir #:nodoc:
+      if windows?
+        File.join(Dir.home, "Rake")
+      else
+        File.join(Dir.home, ".rake")
       end
     end
     private :standard_system_dir

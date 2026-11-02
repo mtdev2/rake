@@ -35,7 +35,7 @@ module Rake
       task.set_arg_names(arg_names) unless arg_names.empty?
       if Rake::TaskManager.record_task_metadata
         add_location(task)
-        task.add_description(get_description(task))
+        task.add_description(get_description)
       end
       task.enhance(Task.format_deps(deps), &block)
       task | order_only unless order_only.nil?
@@ -300,8 +300,10 @@ module Rake
         when /^\./
           source = task_name.sub(task_pattern, ext)
           source == ext ? task_name.ext(ext) : source
-        when String
-          ext
+        when String, Symbol
+          ext.to_s
+        when Pathname
+          Rake.from_pathname(ext)
         when Proc, Method
           if ext.arity == 1
             ext.call(task_name)
@@ -316,7 +318,7 @@ module Rake
     end
 
     # Return the current description, clearing it in the process.
-    def get_description(task)
+    def get_description
       desc = @last_description
       @last_description = nil
       desc

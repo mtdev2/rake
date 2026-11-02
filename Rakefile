@@ -10,8 +10,11 @@ lib = File.expand_path("../lib", __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 begin
+  old_verbose, $VERBOSE = $VERBOSE, nil
   require "bundler/gem_tasks"
 rescue LoadError
+ensure
+  $VERBOSE = old_verbose
 end
 
 require "rake/testtask"
@@ -26,16 +29,7 @@ RDoc::Task.new do |doc|
   doc.main   = "README.rdoc"
   doc.title  = "Rake -- Ruby Make"
   doc.rdoc_files = FileList.new %w[lib MIT-LICENSE doc/**/*.rdoc *.rdoc]
-  doc.rdoc_dir = "html"
-end
-
-task ghpages: :rdoc do
-  %x[git checkout gh-pages]
-  require "fileutils"
-  FileUtils.rm_rf "/tmp/html"
-  FileUtils.mv "html", "/tmp"
-  FileUtils.rm_rf "*"
-  FileUtils.cp_r Dir.glob("/tmp/html/*"), "."
+  doc.rdoc_dir = "_site" # for github pages
 end
 
 task default: :test

@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-require "rake/file_utils"
+require_relative "file_utils"
 
 module Rake
   #
@@ -53,6 +53,7 @@ module Rake
     def verbose(value=nil)
       oldvalue = FileUtilsExt.verbose_flag
       FileUtilsExt.verbose_flag = value unless value.nil?
+
       if block_given?
         begin
           yield
